@@ -8,6 +8,11 @@
 [image8]: assets/hadoop_tools.png "image8"
 [image9]: assets/spark_tools.png "image9"
 [image10]: assets/map_reduce_flow.png "image10"
+[image11]: assets/spark_cluster.png "image11"
+[image12]: assets/spark_use_cases.png "image12"
+[image13]: assets/func_vs_proc_prog.png "image13"
+
+
 
 
 # Spark
@@ -31,16 +36,20 @@ Here is an outline of the topics:
 	- [Introduction to distributed systems](#intro_distr_sys)
 	- [The Hadoop Ecosystem](#hadoop)
 	- [Map Reduce](#map_reduce)
+	- [The Spark Cluster](#spark_cluster)
 	- [Common Spark use cases](#intro_distr_sys)
 	- [Introduction to distributed systems](#common_spark_uses)
 	- [Other technologies in the big data ecosystems](#other_techs)
+
+- [Data Wrangling with Spark](#data_wrangling)
+	- [Functional Style of Programming](#func_prog)
 
 
 - [Setup Instructions](#Setup_Instructions)
 - [Acknowledgments](#Acknowledgments)
 - [Further Links](#Further_Links)
 
-## The Power of Spark <a name="power_of_spark"></a>
+# The Power of Spark <a name="power_of_spark"></a>
 
 ## Numbers Everyone should know <a name="numbers_to_know"></a>
 - Understanding harware components is the key to know if a task/dataset is a "big data" problem or if it's easier to analyze the data locally on your own computer.
@@ -168,12 +177,162 @@ Spark has a streaming library called [Spark Streaming](https://spark.apache.org/
 
 - Open Jupyte Notebook ```MapReduce.ipynb```
 
-```
-```
+	```
+	# Install mrjob library. This package is for running MapReduce jobs with Python
+	# In Jupyter notebooks, "!" runs terminal commands from inside notebooks 
+
+	! pip install mrjob
+	```
+
+	```
+	%%file wordcount.py
+	# %%file is an Ipython magic function that saves the code cell as a file
+
+	from mrjob.job import MRJob # import the mrjob library
+
+	class MRSongCount(MRJob):
+		
+		# the map step: each line in the txt file is read as a key, value pair
+		# in this case, each line in the txt file only contains a value but no key
+		# _ means that in this case, there is no key for each line
+		def mapper(self, _, song):
+			# output each line as a tuple of (song_names, 1) 
+			yield (song, 1)
+
+		# the reduce step: combine all tuples with the same key
+		# in this case, the key is the song name
+		# then sum all the values of the tuple, which will give the total song plays
+		def reducer(self, key, values):
+			yield (key, sum(values))
+			
+	if __name__ == "__main__":
+		MRSongCount.run()
+	```
+
+	```
+	# run the code as a terminal command
+	! python wordcount.py songplays.txt
+	```
+
+## The Spark Cluster <a name="spark_cluster"></a>
+- Each node of a cluster is responsible for a set of operations on a subset of the data
+- How do the nodes know which task to run and in which order?
+- Hirarchy: Master-Worker
+- Master Node: Orchestrating the tasks across the cluster
+- Worker Nodes: Performing the actual computations
+
+- There are ***4 nodes*** tos setup Spark:
+- **Local Mode** 
+	- Everything happens on a single machine 
+	- No real distributed computing
+	- Usefuk to learn syntax and for prototyping
+- **Cluster Modes**: - **Standalone** - **Yarn** - **Mesos**
+	- Distributed computing
+	- Yarn and Mesos implement a **Cluster Manager**
+	- Standalone implements a **Driver** program. It acts as the master
+	- Cluster Manager monitors available resources
+	- Makes sure that all machines are responsive during the job
+	- Yarn and Mesos are usefull when you are sharing a cluster with a team
+
+
+	![image11]
 
 ## Common Spark use cases <a name="common_spark_uses"></a>
 
+Spark Use Cases and Resources
+Here are a few resources about different Spark use cases:
+
+- [Data Analytics](http://spark.apache.org/sql/)
+- [Machine Learning](http://spark.apache.org/mllib/)
+- [Streaming](http://spark.apache.org/streaming/)
+- [Graph Analytics](http://spark.apache.org/graphx/)
+
+	![image12]
+
 ## Other technologies in the big data ecosystem <a name="other_techs"></a>
+
+### You Don't Always Need Spark
+- Spark is meant for big data sets that cannot fit on one computer. But you don't need Spark if you are working on smaller data sets. In the cases of data sets that can fit on your local computer, there are many other options out there you can use to manipulate data such as:
+
+	- [AWK](https://en.wikipedia.org/wiki/AWK) - a command line tool for manipulating text files
+	- [R](https://www.r-project.org/) - a programming language and software environment for statistical computing
+	- [Python PyData Stack](https://pydata.org/downloads/), which includes pandas, Matplotlib, NumPy, and scikit-learn among other libraries
+	
+- Sometimes, you can still use pandas on a single, local machine even if your data set is only a little bit larger than memory. Pandas can read data in chunks. Depending on your use case, you can filter the data and write out the relevant parts to disk.
+
+- If the data is already stored in a relational database such as [MySQL](https://www.mysql.com/) or [Postgres](https://www.postgresql.org/), you can leverage SQL to extract, filter and aggregate the data. If you would like to leverage pandas and SQL simultaneously, you can use libraries such as [SQLAlchemy](https://www.sqlalchemy.org/), which provides an abstraction layer to manipulate SQL tables with generative Python expressions.
+
+The most commonly used Python Machine Learning library is [scikit-learn](https://scikit-learn.org/stable/). It has a wide range of algorithms for classification, regression, and clustering, as well as utilities for preprocessing data, fine tuning model parameters and testing their results. However, if you want to use more complex algorithms - like deep learning - you'll need to look further. [TensorFlow](https://www.tensorflow.org/) and [PyTorch](https://pytorch.org/) are currently popular packages.
+
+### Spark's Limitations
+Spark has some limitation.
+
+- ***Spark Streaming’s latency*** is at least 500 milliseconds since it operates on micro-batches of records, instead of processing one record at a time. Native streaming tools such as [Storm](http://storm.apache.org/), [Apex](https://apex.apache.org/), or [Flink](https://flink.apache.org/) can push down this latency value and might be more suitable for low-latency applications. Flink and Apex can be used for batch computation as well, so if you're already using them for stream processing, there's no need to add Spark to your stack of technologies.
+
+- Another limitation of Spark is its ***selection of machine learning algorithms***. Currently, Spark only supports algorithms that scale linearly with the input data size. In general, deep learning is not available either, though there are many projects integrate Spark with Tensorflow and other deep learning tools.
+
+### Hadoop versus Spark
+- The Hadoop ecosystem is a slightly older technology than the Spark ecosystem. In general, Hadoop MapReduce is slower than Spark because Hadoop writes data out to disk during intermediate steps. However, many big companies, such as Facebook and LinkedIn, started using Big Data early and built their infrastructure around the Hadoop ecosystem.
+
+W- hile Spark is great for iterative algorithms, there is not much of a performance boost over Hadoop MapReduce when doing simple counting. Migrating legacy code to Spark, especially on hundreds of nodes that are already in production, might not be worth the cost for the small performance boost.
+
+- Beyond Spark for Storing and Processing Big Data
+Keep in mind that Spark is not a data storage system, and there are a number of tools besides Spark that can be used to process and analyze large datasets.
+
+- Sometimes it makes sense to use the power and simplicity of SQL on big data. For these cases, a new class of databases, know as NoSQL and NewSQL, have been developed.
+
+- For example, newer database storage systems like [HBase](https://hbase.apache.org/) or [Cassandra](https://cassandra.apache.org/). There are also distributed SQL engines like [Impala](https://impala.apache.org/) and [Presto](https://prestodb.io/). Many of these technologies use query syntax.
+
+
+# Data Wrangling with Spark <a name="data_wrangling"></a> 
+##  Functional Style of Programming  <a name="func_prog"></a>
+- Spark is written in a language called Scala
+- However: There are Programming Interfaces even for Python --> PySpark
+- But even in PySpark a funtional programming style is preferred against a procedual one.
+- Even Python is not a functional programming language, the PySpark is written with functional programming principles in mind.
+- Underneath the hood, the Python code uses py4j to make calls to the Java Virtual Machine (JVM).
+
+	![image13]
+
+### Why Functional Programming?
+- Functional programming is perfect for distributed systems
+- If on machine crashes it will not affect other machines
+- The crashed machine can be restarted independently
+
+### Example: Procedual Programming:
+- Open Notebook ```procedural_prog.ipynb````
+	```
+	log_of_songs = [
+        "Despacito",
+        "Nice for what",
+        "No tears left to cry",
+        "Despacito",
+        "Havana",
+        "In my feelings",
+        "Nice for what",
+        "Despacito",
+        "All the stars"
+	]
+	```
+	```
+	play_count = 0
+	```
+	```
+	def count_plays(song_title):
+		global play_count
+		for song in log_of_songs:
+			if song == song_title:
+				play_count = play_count + 1
+		return play_count
+	```
+	```
+	count_plays("Despacito")
+	Result: 3
+	```
+	```
+	count_plays("Despacito")
+	Result: 6
+	```
 
 
 ## Setup Instructions <a name="Setup_Instructions"></a>
