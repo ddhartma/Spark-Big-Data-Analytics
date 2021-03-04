@@ -19,6 +19,26 @@
 [image19]: assets/rdds.png "image19"
 [image20]: assets/aws_emr_setup_pt1.png "image20"
 [image21]: assets/aws_emr_setup_pt2.png "image21"
+[image22]: assets/aws_setup_standalone.png "image22"
+[image23]: assets/spark_scipts.png "image23"
+[image24]: assets/script_for_submission.png "image24"
+[image25]: assets/submit_command.png "image25"
+[image26]: assets/storage_s3.png "image26"
+[image27]: assets/open_notebook.png "image27"
+[image28]: assets/load_from_s3.png "image28"
+[image29]: assets/s3_hdfs_spark.png "image29"
+[image30]: assets/hdfs_storage_aws.png "image30"
+[image31]: assets/submit_json_to_hdfs.png "image31"
+[image32]: assets/hdfs_new_folder.png "image32"
+[image33]: assets/copyFromFile.png "image33"
+[image34]: assets/hdfs_file_in_folder.png "image34"
+[image35]: assets/hdfs_read.png "image35"
+[image36]: assets/data_error.png "image36"
+[image37]: assets/debug_via_print.png "image37"
+[image38]: assets/accumulator.png "image38"
+[image39]: assets/web_ui.png "image39"
+[image40]: assets/metrics_and_cohort_analysis.png "image40"
+[image41]: assets/data_skew.png "image41"
 
 # Spark
 How to deal with ***Big Data***?
@@ -66,6 +86,16 @@ Here is an outline of the topics:
 
 - [Debugging and Optimization](#debug_optimize)
 	- [Setup Instructions for AWS](#aws)
+	- [Standalone setup on AWS](#aws_standalone)
+	- [Spark Scripts](#spark_scripts)
+	- [Submitting Spark Scripts](#submit_spark_scripts)
+	- [Storing and Retrieving Data on the Cloud - S3](#storing_S3)
+	- [HDFS and Spark](#hdfs_spark)
+	- [Storing and Retrieving Data on the Cloud - HDFS](#storing_hdfs)
+	- [Debugging - Data Errors](#debug_data_errors)
+	- [Problem of Data Skew](#data_skew)
+	- [Sparkify Key Metrics and Cohort Analysis](#spark_key_metrics)
+	- [Troubleshooting Other Spark Issues](#troubleshooting)
 
 
 - [Setup Instructions](#Setup_Instructions)
@@ -1334,6 +1364,160 @@ Here is a link to the Spark documentation's [RDD programming guide](https://spar
 	![image20]
 	![image21]
 
+## Standalone setup on AWS <a name="aws_standalone"></a>
+- Login to AWS in a rented Spark Cluster and using S3 Data Storage
+	![image22]
+
+## Spark Scripts <a name="spark_scripts"></a> 
+- Use Spark scripts to automate updates 
+	![image23]
+
+## Submitting Spark Scripts  <a name="submit_spark_scripts"></a>  
+- Be logged in to Hadoop EMR
+- Open Terminal 
+- The py script for submission
+	![image24]
+
+- The submission command
+	![image25]
+
+
+## Storing and Retrieving Data on the Cloud  - S3 <a name="storing_S3"></a>
+- S3 is like "Dropbox" or "iCloud" for Big Data
+	![image26]
+
+- Open Notebook under Amazon EMR
+	![image27]
+
+- Set the loacation via ```s3n://...```
+- Load data from S3 like this
+	![image28]
+
+# HDFS and Spark <a name="hdfs_spark"></a>
+- By using S3 you separate data storage from the cluster
+- Downside: You have to download across the network into the Spark cluster --> slow process bottleneck 
+- HDFS is much faster: Store Data on the Spark Cluster 
+- HDFS comes preinstalled on Spark - only little setup needed
+- When Spark needs Data from HDFS it crabs the closest copy
+- This reduces time that data travels around the network
+- Downside: You have to maintain Data by yourself 
+- S3 is much easier to handle 
+	![image29]
+
+
+## Storing and Retrieving Data on the Cloud  - HDFS <a name="storing_hdfs"></a>
+- Let's do the same storage process with HDFS
+
+	![image30]
+
+- Write files to HDFS
+- Open Terminal
+
+	![image31]
+
+- create a new folder on the cluster 
+	![image32]
+- use **copyFromLocal** to copy the json file to this folder
+	![image33]
+
+- Now the file is on the Cluster system
+	![image34]
+
+- Read Data from HDFS via ```hdfs:///...```
+	![image35]
+
+## Debugging - Data Errors  <a name="debug_data_errors"></a> 
+-  Sometimes records can be broken like this
+	![image36]
+
+- As each node has their own copy of variables and print statements are also distributed to each worker debugging via print statements will not work. 
+- Original values omn the driver remain unchanged
+	![image37]
+
+-  Use accumulators - these are like global variables for the entire cluster
+	![image38]
+
+- Use the web ui tool for debugging
+	![image39]
+
+## Problem of Data Skew #data_skew) <a name="data_skew"></a> 
+- Sometimes 80% of your data comes from 20% of your users
+	![image41]
+
+
+## Troubleshooting Other Spark Issues <a name="troubleshooting"></a> 
+You can debug based on error messages, loglines and stack traces.
+
+Very common issue with Spark jobs that can be harder to address: everything working fine but just taking a very long time. So what do you do when your Spark job is (too) slow?
+
+### Insufficient resources
+Often while there are some possible ways of improvement, processing large data sets just takes a lot longer time than smaller ones even without any big problem in the code or job tuning. Using more resources, either by increasing the number of executors or using more powerful machines, might just not be possible. When you have a slow job it’s useful to understand:
+
+How much data you’re actually processing (compressed file formats can be tricky to interpret) If you can decrease the amount of data to be processed by filtering or aggregating to lower cardinality, And if resource utilization is reasonable.
+
+There are many cases where different stages of a Spark job differ greatly in their resource needs: loading data is typically I/O heavy, some stages might require a lot of memory, others might need a lot of CPU. Understanding these differences might help to optimize the overall performance. Use the Spark UI and logs to collect information on these metrics.
+
+If you run into out of memory errors you might consider increasing the number of partitions. If the memory errors occur over time you can look into why the size of certain objects is increasing too much during the run and if the size can be contained. Also, look for ways of freeing up resources if garbage collection metrics are high.
+
+Certain algorithms (especially ML ones) use the driver to store data the workers share and update during the run. If you see memory issues on the driver check if the algorithm you’re using is pushing too much data there.
+
+### Data skew
+If you drill down in the Spark UI to the task level you can see if certain partitions process significantly more data than others and if they are lagging behind. Such symptoms usually indicate a skewed data set. Consider implementing the techniques mentioned in this lesson:
+
+Add an intermediate data processing step with an alternative key Adjust the spark.sql.shuffle.partitions parameter if necessary
+
+The problem with data skew is that it’s very specific to a dataset. You might know ahead of time that certain customers or accounts are expected to generate a lot more activity but the solution for dealing with the skew might strongly depend on how the data looks like. If you need to implement a more general solution (for example for an automated pipeline) it’s recommended to take a more conservative approach (so assume that your data will be skewed) and then monitor how bad the skew really is.
+
+### Inefficient queries
+Once your Spark application works it’s worth spending some time to analyze the query it runs. You can use the Spark UI to check the DAG and the jobs and stages it’s built of.
+
+Spark’s query optimizer is called Catalyst. While Catalyst is a powerful tool to turn Python code to an optimized query plan that can run on the JVM it has some limitations when optimizing your code. It will for example push filters in a particular stage as early as possible in the plan but won’t move a filter across stages. It’s your job to make sure that if early filtering is possible without compromising the business logic than you perform this filtering where it’s more appropriate.
+
+It also can’t decide for you how much data you’re shuffling across the cluster. Remember from the first lesson how expensive sending data through the network is. As much as possible try to avoid shuffling unnecessary data. In practice, this means that you need to perform joins and grouped aggregations as late as possible.
+
+When it comes to joins there is more than one strategy to choose from. If one of your data frames are small consider using broadcast hash join instead of a hash join.
+
+Further reading
+Debugging and tuning your Spark application can be a daunting task. There is an ever-growing community out there though, always sharing new ideas and working on improving Spark and its tooling, to make using it easier. So if you have a complicated issue don’t hesitate to reach out to others (via user mailing lists, forums, and Q&A sites).
+
+You can find more information on tuning [Spark](https://spark.apache.org/docs/latest/tuning.html) and [Spark SQL](https://spark.apache.org/docs/latest/sql-performance-tuning.html) in the documentation.
+
+
+## Sparkify Key Metrics and Cohort Analysis <a name="spark_key_metrics"></a> 
+- ***Monthly active user***: The number of users who listend to at least one song in the past month. This gives you a better sense of how  many people are using your site on a regular basis
+- This number is better than looking at the total number of accounts
+- ***Daily active users***:  The number of users who listend to at least one song at each day on the last month. Both total number and percentage wrt user last month. Daily active users give you a hint of how engaged your users are.
+- ***Total number of paid and unpaid users***
+- ***Total Ads Served in the last month*** - This indicates the monthly revenue that Sparkify earns
+
+	![image40]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Setup Instructions <a name="Setup_Instructions"></a>
 The following is a brief set of instructions on setting up a cloned repository.
@@ -1344,7 +1528,6 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites: Installation of Python via Anaconda and Command Line Interaface <a name="Prerequisites"></a>
 - Install [Anaconda](https://www.anaconda.com/distribution/). Install Python 3.7 - 64 Bit
-- If you need a Command Line Interface (CLI) under Windows you could use [git](https://git-scm.com/). Under Mac OS use the pre-installed Terminal.
 
 - Upgrade Anaconda via
 ```
