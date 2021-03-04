@@ -16,6 +16,7 @@
 [image16]: assets/spark_session.png "image16"
 [image17]: assets/imp_vs_decl_prog.png "image17"
 [image18]: assets/wrangling_matplotlib.png "image18"
+[image19]: assets/rdds.png "image19"
 
 # Spark
 How to deal with ***Big Data***?
@@ -56,9 +57,10 @@ Here is an outline of the topics:
 	- [Reading and Writing to Spark Dataframes](#read_write_df)
 	- [Imperative vs Declarative programming](#imp_vs_decl)
 	- [Data Wrangling with DataFrames](#wrangle_dataframes)
-	- [](#)
-	- [](#)
-	- [](#)
+	- [Wrangling Data Functions Overview](#wrangle_data_fun_overview)
+	- [Difference between collect(), show(), take()](#differences_spark_collect_show_take)
+	- [Spark SQL](#spark_sql)
+	- [RDDs](#rdds)
 	- [](#)
 	- [](#)
 
@@ -509,7 +511,7 @@ Keep in mind that Spark is not a data storage system, and there are a number of 
 - Take a look at a particular record e.g. the first with the **show()** method via ```user_log.show(n=1)``` 
 - With the **take()** method you can grab the first few methods ```user_log.take(5)``` 
 - ***Save*** data into a csv file via ```user_log.write.save(out_path, format = "csv", header=True)```
-- ***Load*** the previously saved csv file into another datraframe via ```user_log_2 = spark.read.csv(out_path, header = True)
+- ***Load*** the previously saved csv file into another datraframe via ```user_log_2 = spark.read.csv(out_path, header = True)``` 
 
 	Import SparkConf and SparkSession
 	```
@@ -842,6 +844,7 @@ Keep in mind that Spark is not a data storage system, and there are a number of 
 	```
 	![image18]
 
+	
 	### Drop Rows with Missing Values
 	With dropna-any method we drop all records that have none in the subset user_ID and sessionId
 	```
@@ -985,21 +988,315 @@ Keep in mind that Spark is not a data storage system, and there are a number of 
 	Row(userId='1138', firstname='Kelly', ts=1513833144284, page='NextSong', level='free', phase=0)]
 	```
 
+## Wrangling Data Functions Overview <a name="wrangle_data_fun_overview"></a>
+### General Functions
+- **select()**: returns a new DataFrame with the selected columns
+- **filter()**: filters rows using the given condition
+- **where()**: is just an alias for filter()
+- **groupBy()**: groups the DataFrame using the specified columns, so we can run aggregation on them
+- **sort()**: returns a new DataFrame sorted by the specified column(s). By default the second parameter 'ascending' is True.
+- **dropDuplicates()**: returns a new DataFrame with unique rows based on all or just a subset of columns
+- **withColumn()**: returns a new DataFrame by adding a column or replacing the existing column that has the same name. The first parameter is the name of the new column, the second is an expression of how to compute it.
+
+### Aggregate Functions:
+- Spark SQL provides built-in methods for the most common aggregations such as **count()**, **countDistinct()**, **avg()**, **max()**, **min()**, etc. in the **pyspark.sql.functions module**. These methods are not the same as the built-in methods in the Python Standard Library, where we can find min() for example as well, hence you need to be careful not to use them interchangeably.
+
+- In many cases, there are multiple ways to express the same aggregations. For example, if we would like to compute one type of aggregate for one or more columns of the DataFrame we can just simply chain the aggregate method after a groupBy(). If we would like to use different functions on different columns, **agg()** comes in handy. For example **agg({"salary": "avg", "age": "max"})** computes the **average salary and maximum age**.
+
+### User defined functions (UDF)
+- In Spark SQL we can define our own functions with the **udf** method from the **pyspark.sql.functions module**. The default type of the returned variable for UDFs is string. If we would like to return an other type we need to explicitly do so by using the different types from the pyspark.sql.types module.
+
+### Window functions
+- Window functions are a way of **combining the values of ranges of rows in a DataFrame**. When defining the window we can **choose how to sort and group** (with the **partitionBy** method) the rows and how wide of a window we'd like to use (described by rangeBetween or rowsBetween).
+
+For further information see the [Spark SQL, DataFrames and Datasets Guide](https://spark.apache.org/docs/latest/sql-programming-guide.html) and the [Spark Python API Docs](https://spark.apache.org/docs/latest/api/python/index.html).
+
+## Difference between collect(), show(), take() <a name="differences_spark_collect_show_take"></a>
+
+- df.show() - shows only content
+	```
+	df.show()
+	
+	Result:
+	+----+-------+
+	| age|   name|
+	+----+-------+
+	|null|Michael|
+	|  30|   Andy|
+	|  19| Justin|
+	+----+-------+
+	```
+- df.collect() - shows content and structure/metadata 
+	```
+	df.collect()
+	
+	Result:
+	[Row(age=None, name=u'Michael'),
+	Row(age=30, name=u'Andy'),
+	Row(age=19, name=u'Justin')]
+	```
+- df.take(2) -  to see only first two rows of the dataframe
+	```
+	df.take(2)
+	
+	Result:
+	[Row(age=None, name=u'Michael'), Row(age=30, name=u'Andy')]
+	```
+
+## Spark SQL <a name="spark_sql"></a>
+- Declarative Appoach of Programming
+- [Spark SQL built-in functions](https://spark.apache.org/docs/latest/api/sql/index.html)
+- [Spark SQL guide](https://spark.apache.org/docs/latest/sql-getting-started.html)
+- Open Jupyter notebook ```data_wrangling_sql.ipynb```
+- Further queries: Open Jupyter Notebook ```spark_sql_quiz_solution.ipynb```
+	```
+	from pyspark.sql import SparkSession
+	from pyspark.sql.functions import udf
+	from pyspark.sql.types import StringType
+	from pyspark.sql.types import IntegerType
+	from pyspark.sql.functions import desc
+	from pyspark.sql.functions import asc
+	from pyspark.sql.functions import sum as Fsum
+
+	import datetime
+
+	import numpy as np
+	import pandas as pd
+	%matplotlib inline
+	import matplotlib.pyplot as plt
+	```
+	```
+	spark = SparkSession \
+    	.builder \
+		.appName("Data wrangling with Spark SQL") \
+		.getOrCreate()
+	```
+	```
+	path = "data/sparkify_log_small.json"
+	user_log = spark.read.json(path)
+	```
+	```
+	user_log.take(1)
+
+	Result:
+	[Row(artist='Showaddywaddy', auth='Logged In', firstName='Kenneth', gender='M', itemInSession=112, lastName='Matthews', length=232.93342, level='paid', location='Charlotte-Concord-Gastonia, NC-SC', method='PUT', page='NextSong', registration=1509380319284, sessionId=5132, song='Christmas Tears Will Fall', status=200, ts=1513720872284, userAgent='"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36"', userId='1046')]
+	```
+	```
+	user_log.printSchema()
+
+	Result:
+	root
+	|-- artist: string (nullable = true)
+	|-- auth: string (nullable = true)
+	|-- firstName: string (nullable = true)
+	|-- gender: string (nullable = true)
+	|-- itemInSession: long (nullable = true)
+	|-- lastName: string (nullable = true)
+	|-- length: double (nullable = true)
+	|-- level: string (nullable = true)
+	|-- location: string (nullable = true)
+	|-- method: string (nullable = true)
+	|-- page: string (nullable = true)
+	|-- registration: long (nullable = true)
+	|-- sessionId: long (nullable = true)
+	|-- song: string (nullable = true)
+	|-- status: long (nullable = true)
+	|-- ts: long (nullable = true)
+	|-- userAgent: string (nullable = true)
+	|-- userId: string (nullable = true)
+	```
+	### Create a view and run queries
+	The code below creates a temporary view against which you can run SQL queries.
+	It updates a view if one already exists or creates a new one if not. It is temporarily. By closing the notebook it is gone.
+	```
+	user_log.createOrReplaceTempView("user_log_table")
+	```
+	```
+	spark.sql("SELECT * FROM user_log_table LIMIT 2").show()
+
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	|       artist|     auth|firstName|gender|itemInSession|lastName|   length|level|            location|method|    page| registration|sessionId|                song|status|           ts|           userAgent|userId|
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	|Showaddywaddy|Logged In|  Kenneth|     M|          112|Matthews|232.93342| paid|Charlotte-Concord...|   PUT|NextSong|1509380319284|     5132|Christmas Tears W...|   200|1513720872284|"Mozilla/5.0 (Win...|  1046|
+	|   Lily Allen|Logged In|Elizabeth|     F|            7|   Chase|195.23873| free|Shreveport-Bossie...|   PUT|NextSong|1512718541284|     5027|       Cheryl Tweedy|   200|1513720878284|"Mozilla/5.0 (Win...|  1000|
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	```
+	```
+	spark.sql('''
+          SELECT * 
+          FROM user_log_table 
+          LIMIT 2
+          '''
+          ).show()
+
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	|       artist|     auth|firstName|gender|itemInSession|lastName|   length|level|            location|method|    page| registration|sessionId|                song|status|           ts|           userAgent|userId|
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	|Showaddywaddy|Logged In|  Kenneth|     M|          112|Matthews|232.93342| paid|Charlotte-Concord...|   PUT|NextSong|1509380319284|     5132|Christmas Tears W...|   200|1513720872284|"Mozilla/5.0 (Win...|  1046|
+	|   Lily Allen|Logged In|Elizabeth|     F|            7|   Chase|195.23873| free|Shreveport-Bossie...|   PUT|NextSong|1512718541284|     5027|       Cheryl Tweedy|   200|1513720878284|"Mozilla/5.0 (Win...|  1000|
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	```
+	```
+	spark.sql('''
+          SELECT COUNT(*) 
+          FROM user_log_table 
+          '''
+          ).show()
+	
+	Result:
+	+--------+
+	|count(1)|
+	+--------+
+	|   10000|
+	+--------+
+	```
+	```
+	spark.sql('''
+          SELECT userID, firstname, page, song
+          FROM user_log_table 
+          WHERE userID == '1046'
+          '''
+          ).collect()
+	
+	Result:
+	[Row(userID='1046', firstname='Kenneth', page='NextSong', song='Christmas Tears Will Fall'),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='Be Wary Of A Woman'),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='Public Enemy No.1'),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='Reign Of The Tyrants'),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='Father And Son'),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='No. 5'),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='Seventeen'),
+	Row(userID='1046', firstname='Kenneth', page='Home', song=None),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='War on war'),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='Killermont Street'),
+	Row(userID='1046', firstname='Kenneth', page='NextSong', song='Black & Blue'),
+
+	...
+	]
+	```
+	DISTINCT is like drop_dublicates
+	```
+	spark.sql('''
+          SELECT DISTINCT page
+          FROM user_log_table 
+          ORDER BY page ASC
+          '''
+          ).show()
+
+	Result:
+	+----------------+
+	|            page|
+	+----------------+
+	|           About|
+	|       Downgrade|
+	|           Error|
+	|            Help|
+	|            Home|
+	|           Login|
+	|          Logout|
+	|        NextSong|
+	|   Save Settings|
+	|        Settings|
+	|Submit Downgrade|
+	|  Submit Upgrade|
+	|         Upgrade|
+	+----------------+
+	```
+	### User Defined Functions
+	In contrast to the imperative approach, here udfs have to be registered
+	```
+	spark.udf.register("get_hour", lambda x: int(datetime.datetime.fromtimestamp(x / 1000.0).hour))
+	```
+	```
+	spark.sql('''
+          SELECT *, get_hour(ts) AS hour
+          FROM user_log_table 
+          LIMIT 1
+          '''
+          ).collect()
+
+	Result
+	[Row(artist='Showaddywaddy', auth='Logged In', firstName='Kenneth', gender='M', itemInSession=112, lastName='Matthews', length=232.93342, level='paid', location='Charlotte-Concord-Gastonia, NC-SC', method='PUT', page='NextSong', registration=1509380319284, sessionId=5132, song='Christmas Tears Will Fall', status=200, ts=1513720872284, userAgent='"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36"', userId='1046', hour='22')]
+	```
+	```
+	songs_in_hour = spark.sql('''
+          SELECT get_hour(ts) AS hour, COUNT(*) as plays_per_hour
+          FROM user_log_table
+          WHERE page = "NextSong"
+          GROUP BY hour
+          ORDER BY cast(hour as int) ASC
+          '''
+          )
+	```
+	```
+	songs_in_hour.show()
+
+	Result:
+	+----+--------------+
+	|hour|plays_per_hour|
+	+----+--------------+
+	|   0|           456|
+	|   1|           454|
+	|   2|           382|
+	|   3|           302|
+	|   4|           352|
+	|   5|           276|
+	|   6|           348|
+	|   7|           358|
+	|   8|           375|
+	|   9|           249|
+	|  10|           216|
+	|  11|           228|
+	|  12|           251|
+	|  13|           339|
+	|  14|           462|
+	|  15|           479|
+	|  16|           484|
+	|  17|           430|
+	|  18|           362|
+	|  19|           295|
+	+----+--------------+
+	only showing top 20 rows
+	```
+	### Converting Results to Pandas
+	```
+	songs_in_hour_pd = songs_in_hour.toPandas()
+	print(songs_in_hour_pd)
+
+	Resut:
+	   hour  plays_per_hour
+	0     0             456
+	1     1             454
+	2     2             382
+	3     3             302
+	4     4             352
+	5     5             276
+	6     6             348
+	7     7             358
+	8     8             375
+	9     9             249
+	10   10             216
+	11   11             228
+	12   12             251
+	13   13             339
+	14   14             462
+	15   15             479
+	16   16             484
+	17   17             430
+	18   18             362
+	19   19             295
+	20   20             257
+	21   21             248
+	22   22             369
+	23   23             375
+	```
 
 
+## RDDs <a name="rdds"></a>
+- RDDs are a low-level abstraction of the data. In the first version of Spark, you worked directly with RDDs. You can think of RDDs as long lists distributed across various machines. You can still use RDDs as part of your Spark code although data frames and SQL are easier. This course won't go into the details of RDD syntax, but you can find some further explanation of the difference between RDDs and DataFrames in Databricks' [A Tale of Three Apache Spark APIs: RDDs, DataFrames, and Datasets](https://databricks.com/blog/2016/07/14/a-tale-of-three-apache-spark-apis-rdds-dataframes-and-datasets.html) blog post.
 
-
-
-
-
-
-
-
-
-
-
-
-
+Here is a link to the Spark documentation's [RDD programming guide](https://spark.apache.org/docs/latest/rdd-programming-guide.html).
+![image19]
 
 
 
