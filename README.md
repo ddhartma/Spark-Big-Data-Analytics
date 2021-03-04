@@ -11,9 +11,9 @@
 [image11]: assets/spark_cluster.png "image11"
 [image12]: assets/spark_use_cases.png "image12"
 [image13]: assets/func_vs_proc_prog.png "image13"
-
-
-
+[image14]: assets/dag.png "image14"
+[image15]: assets/data_storage.png "image15"
+[image16]: assets/spark_session.png "image16"
 
 # Spark
 How to deal with ***Big Data***?
@@ -43,6 +43,17 @@ Here is an outline of the topics:
 
 - [Data Wrangling with Spark](#data_wrangling)
 	- [Functional Style of Programming](#func_prog)
+	- [Why Functional Programming?](#why_func)
+	- [Procedual Programming](#proc_prog)
+	- [The Spark DAGs: Recipe for Data](#dag)
+	- [Maps and Lambda Functions](#map_lambda)
+	- [Example: Functional Programming - sc- parallize - map - collect](#example_func)
+	- [Data Formats](#data_formats)
+	- [Data Stores](#data_stores)
+	- [Spark Session](#spark_session)
+	- [Reading and Writing to Spark Dataframes](#read_write_df)
+	- [](#)
+	- [](#)
 
 
 - [Setup Instructions](#Setup_Instructions)
@@ -291,15 +302,17 @@ Keep in mind that Spark is not a data storage system, and there are a number of 
 - But even in PySpark a funtional programming style is preferred against a procedual one.
 - Even Python is not a functional programming language, the PySpark is written with functional programming principles in mind.
 - Underneath the hood, the Python code uses py4j to make calls to the Java Virtual Machine (JVM).
-
 	![image13]
 
-### Why Functional Programming?
+## Why Functional Programming? <a name="why_func"></a>
 - Functional programming is perfect for distributed systems
 - If on machine crashes it will not affect other machines
 - The crashed machine can be restarted independently
+- In distributed systems functions shouldn't have side effects on variables outside their scope, since this could interfere with other functions running on your cluster
+- In distributed systems you have to be careful with how you design your functions. Whenever some functions run on some input data it can alter it in the process.
+- ***Write functions that preserve their inputs and avoid side effects. PURE FUNCTIONS***
 
-### Example: Procedual Programming:
+## Example: Procedual Programming <a name="proc_prog"></a>
 - Open Notebook ```procedural_prog.ipynb````
 	```
 	log_of_songs = [
@@ -334,11 +347,304 @@ Keep in mind that Spark is not a data storage system, and there are a number of 
 	Result: 6
 	```
 
+## The Spark DAGs: Recipe for Data <a name="dag"></a>
+- Every Spark functions makes a copy of its input data
+- It never changes the original parent data. Spark is immutable
+- Chaining functions to wrangle data. Each function accomplish a small chunk of the work. 
+- Lazy Evaluation: Before Spark does anything wirh the data in the program, it first buils step by step directions of what functions and data it will need. --> It is like a recipe --> DIRECTED ACYCLICAL GRAPH (DAG)
+- Sparks looks at the recipe before it mixes everything together in one big step.
+- Spark builds the DAG from the code and waits till the last possible moment to get the data.
+	![image14]
+
+## Maps and Lambda Functions <a name="map_lambda"></a>
+ - One of the most common functions is maps
+ - Maps simply makes a copy of the original input data and transforms that copy to whatever function you put inside of the map
+ - The term map comes from the mathematical concept ***mapping inputs to outputs***
+ - Directions for the Data - telling each input how to get to the output
+
+### Example: Functional Programming <a name="example_func"></a>
+- Open Jupyter Notebook ```maps_and_lazy_evaluation.ipynb```
+- After some initialization to use Spark in our notebook we convert a log of songs which is just a normal Python list, to a distributed dataset that Spark can use.
+- This is the **SPARK CONTEXT OBJECT - sc** 
+- SC has a method **PARALLIZE** that takes a Python object and distributes the object across the machines in your cluster
+- Spark can use then its functional features on the Dataset
+- Now: Let's do something with the Data - "**lower case**" the song title as a common preprocessing step to standardize data with the Python function **convert_songs_to_lowercase**
+- Next: we apply **MAP** to convert_songs_to_lowercase on each song of the dataset
+- So far Spark has not really converted the Songs to lowercase yet (**Lazy Evaluation**). 
+- Maybe there are other processing steps, like removing punctuation 
+- Spark will wait until the last minute to see if it can streamline its work and combine these into a single **stage** before getting the actual data
+- If one wants to do some action with the data use the **COLLECT** function. It gathers the results from all the machines in the cluster back to the machine running this notebook. 
+- Spark didn't mutate the original dataset. Spark made a copy of the dataset but left the original distributed song log with all of its uppercase letters.
+- **Anonymous Functions**: It's a Python feature from functional programming --> **LAMBDA** function. This shortens the code. It's useful to put the Python lowercase function directly inside the map function
+- lambda x : x.lower()
+- left side is the input argument 
+- right side: what you return 
+
+### In short form:
+- **sc** - Spark context object 
+- **parallize** - distribute Python object across cluster machines
+- **map** - apply a Python function to each dataset record
+- **collect** - gathers results from all machines back to the notebook machine
+
+	```
+	import pyspark
+	sc = pyspark.SparkContext(appName="maps_and_lazy_evaluation_example")
+
+	log_of_songs = [
+			"Despacito",
+			"Nice for what",
+			"No tears left to cry",
+			"Despacito",
+			"Havana",
+			"In my feelings",
+			"Nice for what",
+			"despacito",
+			"All the stars"
+	]
+
+	# parallelize the log_of_songs to use with Spark
+	distributed_song_log = sc.parallelize(log_of_songs)
+	```
+	Convert song names to lowercase
+	```
+	def convert_song_to_lowercase(song):
+		return song.lower()
+
+	convert_song_to_lowercase("Havana")
+	Result: 'havana'
+	```
+	The map step: The map step will go through each song in the list and apply the convert_song_to_lowercase() function. But not instantly --> LAZY EVALUATION
+	```
+	distributed_song_log.map(convert_song_to_lowercase)
+	```
+	To get Spark to actually run the map step, you need to use an "action". The collect() method takes the results from all of the clusters and "collects" them into a single list on the master node.
+	```
+	distributed_song_log.map(convert_song_to_lowercase).collect()
+
+	Result:
+	['despacito',
+	'nice for what',
+	'no tears left to cry',
+	'despacito',
+	'havana',
+	'in my feelings',
+	'nice for what',
+	'despacito',
+	'all the stars']
+	```
+	Note as well that Spark is not changing the original data set: Spark is merely making a copy. You can see this by running collect() on the original dataset.
+	```
+	distributed_song_log.collect()
+
+	Result:
+	['Despacito',
+	'Nice for what',
+	'No tears left to cry',
+	'Despacito',
+	'Havana',
+	'In my feelings',
+	'Nice for what',
+	'despacito',
+	'All the stars']
+	```
+	Use Lambda function to shorten code 
+	```
+	distributed_song_log.map(lambda song: song.lower()).collect()
+
+	Result:
+	['despacito',
+	'nice for what',
+	'no tears left to cry',
+	'despacito',
+	'havana',
+	'in my feelings',
+	'nice for what',
+	'despacito',
+	'all the stars']
+	```
+
+## Data Formats <a name="data_formats"></a>
+- Before we can start any Data Wrangling we need to load Data into Spark
+- Most common: CSV, JSON, HTML, XML
+
+## Data Stores <a name="data_stores"></a>
+- When we need distributed computing we have so much data that we need distributed storage as well. 
+- Distributed file systems, many storage services and distributed databases store data in a fault tolerant way, i.e. if machine breaks or become unavailable, the collected information is not lost 
+- Haddop has a Distributed File System - HDFS - to store data
+- HDFS splits files into 64, 128 MB Blocks and replicates these blocks across the cluster. This way the data is stored in a fault tolerant way and can be accessed in digestible chunks.
+- If we do not want to maintain our own cluster, use Amaton Simple Service Storage (S3)
+
+	![image15]
+
+
+## Spark Session <a name="spark_session"></a>
+1. **SparkContext**: Main Entry point for Spark functionality and connects the cluster to the application
+2. In case of Lower level usage: Create objects with SparkContext.
+	Create a **SparkConf** object to specify some information about the application (name, master node's IP address)
+3. To read DataFrames we need **SparkSession** (a Spark SQL equivalent). Similar to SparkConf we can specify some information about the application
+
+	![image16]
+
+
+
+## Reading and Writing to Spark Dataframes <a name="read_write_df"></a>
+- Open Jupyter Notebook ```data_inputs_and_outputs.ipynb```
+- Let's import and export data ro and from Spark dataframes.  
+	1. Import **SparkSession**
+	2. **getOrcreate()** - if session exists we will update it, if not a new one will be created
+
+- ***Load*** a json file from HDFS on the cluster via ```user_log = spark.read.json(path)```
+- user_log is a DataFrame
+- print the Schema with the **printSchema()** method ```user_log.printSchema()```
+- There are fileds describing the user (userID, firstName, lastName)
+- There is also info about the request: page user accessed, HTTP method, status of request
+- Use the **describe()** method to get info about the dataframe ```user_log.describe()```
+- Take a look at a particular record e.g. the first with the **show()** method via ```user_log.show(n=1)``` 
+- With the **take()** method you can grab the first few methods ```user_log.take(5)``` 
+- ***Save*** data into a csv file via ```user_log.write.save(out_path, format = "csv", header=True)```
+- ***Load*** the previously saved csv file into another datraframe via ```user_log_2 = spark.read.csv(out_path, header = True)
+
+	Import SparkConf and SparkSession
+	```
+	import pyspark
+	from pyspark import SparkConf
+	from pyspark.sql import SparkSession
+	```
+	Update some of the parameters, such as application's name
+	```
+	spark = SparkSession \
+		.builder \
+		.appName("Our first Python Spark SQL example") \
+		.getOrCreate()	
+	```
+	Let's check if the change went through
+	```
+	spark.sparkContext.getConf().getAll()
+
+	Result:
+	[('spark.app.name', 'Our first Python Spark SQL example'),
+	('spark.app.id', 'local-1614853873597'),
+	('spark.driver.port', '39871'),
+	('spark.rdd.compress', 'True'),
+	('spark.serializer.objectStreamReset', '100'),
+	('spark.master', 'local[*]'),
+	('spark.executor.id', 'driver'),
+	('spark.submit.deployMode', 'client'),
+	('spark.driver.host', 'fbbb5c24867d'),
+	('spark.ui.showConsoleProgress', 'true')]
+	```
+	```
+	spark
+
+	Result:
+	SparkSession - in-memory
+
+	SparkContext
+
+	Spark UI
+
+	Version
+		v2.4.3
+	Master
+		local[*]
+	AppName
+		Our first Python Spark SQL example
+	```
+	Let's create our first dataframe from a fairly small sample data set. 
+	```
+	path = "data/sparkify_log_small.json"
+	user_log = spark.read.json(path)
+	user_log.printSchema()
+
+	Result:
+	root
+	|-- artist: string (nullable = true)
+	|-- auth: string (nullable = true)
+	|-- firstName: string (nullable = true)
+	|-- gender: string (nullable = true)
+	|-- itemInSession: long (nullable = true)
+	|-- lastName: string (nullable = true)
+	|-- length: double (nullable = true)
+	|-- level: string (nullable = true)
+	|-- location: string (nullable = true)
+	|-- method: string (nullable = true)
+	|-- page: string (nullable = true)
+	|-- registration: long (nullable = true)
+	|-- sessionId: long (nullable = true)
+	|-- song: string (nullable = true)
+	|-- status: long (nullable = true)
+	|-- ts: long (nullable = true)
+	|-- userAgent: string (nullable = true)
+	|-- userId: string (nullable = true)
+	```
+	Describe the dataframe
+	```
+	user_log.describe()
+
+	Result:
+	DataFrame[summary: string, artist: string, auth: string, firstName: string, gender: string, itemInSession: string, lastName: string, length: string, level: string, location: string, method: string, page: string, registration: string, sessionId: string, song: string, status: string, ts: string, userAgent: string, userId: string]
+	```
+	```
+	user_log.show(n=1)
+
+	Result:
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	|       artist|     auth|firstName|gender|itemInSession|lastName|   length|level|            location|method|    page| registration|sessionId|                song|status|           ts|           userAgent|userId|
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	|Showaddywaddy|Logged In|  Kenneth|     M|          112|Matthews|232.93342| paid|Charlotte-Concord...|   PUT|NextSong|1509380319284|     5132|Christmas Tears W...|   200|1513720872284|"Mozilla/5.0 (Win...|  1046|
+	+-------------+---------+---------+------+-------------+--------+---------+-----+--------------------+------+--------+-------------+---------+--------------------+------+-------------+--------------------+------+
+	only showing top 1 row
+	```
+	```
+	user_log.take(5)
+
+	Result:
+	[Row(artist='Showaddywaddy', auth='Logged In', firstName='Kenneth', gender='M', itemInSession=112, lastName='Matthews', length=232.93342, level='paid', location='Charlotte-Concord-Gastonia, NC-SC', method='PUT', page='NextSong', registration=1509380319284, sessionId=5132, song='Christmas Tears Will Fall', status=200, ts=1513720872284, userAgent='"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36"', userId='1046'),
+	Row(artist='Lily Allen', auth='Logged In', firstName='Elizabeth', gender='F', itemInSession=7, lastName='Chase', length=195.23873, level='free', location='Shreveport-Bossier City, LA', method='PUT', page='NextSong', registration=1512718541284, sessionId=5027, song='Cheryl Tweedy', status=200, ts=1513720878284, userAgent='"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36"', userId='1000'),
+	Row(artist='Cobra Starship Featuring Leighton Meester', auth='Logged In', firstName='Vera', gender='F', itemInSession=6, lastName='Blackwell', length=196.20526, level='paid', location='Racine, WI', method='PUT', page='NextSong', registration=1499855749284, sessionId=5516, song='Good Girls Go Bad (Feat.Leighton Meester) (Album Version)', status=200, ts=1513720881284, userAgent='"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.78.2 (KHTML, like Gecko) Version/7.0.6 Safari/537.78.2"', userId='2219'),
+	Row(artist='Alex Smoke', auth='Logged In', firstName='Sophee', gender='F', itemInSession=8, lastName='Barker', length=405.99465, level='paid', location='San Luis Obispo-Paso Robles-Arroyo Grande, CA', method='PUT', page='NextSong', registration=1513009647284, sessionId=2372, song="Don't See The Point", status=200, ts=1513720905284, userAgent='"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36"', userId='2373'),
+	Row(artist=None, auth='Logged In', firstName='Jordyn', gender='F', itemInSession=0, lastName='Jones', length=None, level='free', location='Syracuse, NY', method='GET', page='Home', registration=1513648531284, sessionId=1746, song=None, status=200, ts=1513720913284, userAgent='"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36"', userId='1747')]
+	```
+	Save and Read again
+	```
+	out_path = "data/sparkify_log_small.csv"
+	user_log.write.save(out_path, format="csv", header=True)
+	user_log_2 = spark.read.csv(out_path, header=True)
+	user_log_2.printSchema()
+
+	...
+	```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Setup Instructions <a name="Setup_Instructions"></a>
 The following is a brief set of instructions on setting up a cloned repository.
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+
+
 
 ### Prerequisites: Installation of Python via Anaconda and Command Line Interaface <a name="Prerequisites"></a>
 - Install [Anaconda](https://www.anaconda.com/distribution/). Install Python 3.7 - 64 Bit
