@@ -17,6 +17,8 @@
 [image17]: assets/imp_vs_decl_prog.png "image17"
 [image18]: assets/wrangling_matplotlib.png "image18"
 [image19]: assets/rdds.png "image19"
+[image20]: assets/aws_emr_setup_pt1.png "image20"
+[image21]: assets/aws_emr_setup_pt2.png "image21"
 
 # Spark
 How to deal with ***Big Data***?
@@ -61,8 +63,9 @@ Here is an outline of the topics:
 	- [Difference between collect(), show(), take()](#differences_spark_collect_show_take)
 	- [Spark SQL](#spark_sql)
 	- [RDDs](#rdds)
-	- [](#)
-	- [](#)
+
+- [Debugging and Optimization](#debug_optimize)
+	- [Setup Instructions for AWS](#aws)
 
 
 - [Setup Instructions](#Setup_Instructions)
@@ -1299,6 +1302,37 @@ Here is a link to the Spark documentation's [RDD programming guide](https://spar
 ![image19]
 
 
+# Debugging an Optimization <a name="debug_optimize"></a>
+
+## Setup Instructions for AWS <a name="aws"></a>
+- Amazon  offers Elastic MapReduce --> EMR
+- EC2 instancies qith many big data technologies like Hadoop Spark etc. already installed and configured
+- Switch to Amazon [AWS](https://aws.amazon.com/de/free/?trk=ps_a134p000003yhZ6AAI&trkCampaign=acq_paid_search_brand&sc_channel=ps&sc_campaign=acquisition_DACH&sc_publisher=google&sc_category=core&sc_country=DACH&sc_geo=EMEA&sc_outcome=Acquisition&sc_detail=amazon%20aws&sc_content=Amazon%20AWS_e&sc_matchtype=e&sc_segment=456911459028&sc_medium=ACQ-P|PS-GO|Brand|Desktop|SU|AWS|Core|DACH|EN|Text&s_kwcid=AL!4422!3!456911459028!e!!g!!amazon%20aws&ef_id=EAIaIQobChMInuHS54-X7wIVybTtCh2NDgNAEAAYASAAEgJzD_D_BwE:G:s&s_kwcid=AL!4422!3!456911459028!e!!g!!amazon%20aws&all-free-tier.sort-by=item.additionalFields.SortRank&all-free-tier.sort-order=asc) 
+- Create an SSH key pair to securely connect to the cluster
+	- Services
+	- EC2
+	- Click on Create Key Pair
+	- Provide a name like ***spark-cluster***
+	- Check the downloaded ***pem file*** 
+- Switch to EMR Service 
+	- Provide a Cluster name, e.g. spark-udacity
+	- Enable Logging to track errors
+	- Keep default S3 location
+	- Use Cluster Setting (Launch mode)
+	- Select emr-5.20.0 
+	- Use Spark: Spark 2.4.0 on Hadoop 2.8.5 YARN with Ganglia 3.7.2 and Zeppelin 0.8.0
+	- Use m5.xlarge for Harware configuration 
+		- M --> multitype family, 
+		- R --> Ram, 
+		- C --> CPU
+		- 5 --> means 5th generation of hardware (cheaper and more powerful than previous ones)
+		- xlarge --> size of the instance indicates the hardware quality 
+		- small --> would have less CPU, memory, storage and networking than extra large
+	- Pick the EC2 key pair (spark-cluster) to connect with th cluster
+
+
+	![image20]
+	![image21]
 
 
 ## Setup Instructions <a name="Setup_Instructions"></a>
