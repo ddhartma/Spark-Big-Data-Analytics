@@ -14,6 +14,8 @@
 [image14]: assets/dag.png "image14"
 [image15]: assets/data_storage.png "image15"
 [image16]: assets/spark_session.png "image16"
+[image17]: assets/imp_vs_decl_prog.png "image17"
+[image18]: assets/wrangling_matplotlib.png "image18"
 
 # Spark
 How to deal with ***Big Data***?
@@ -52,6 +54,11 @@ Here is an outline of the topics:
 	- [Data Stores](#data_stores)
 	- [Spark Session](#spark_session)
 	- [Reading and Writing to Spark Dataframes](#read_write_df)
+	- [Imperative vs Declarative programming](#imp_vs_decl)
+	- [Data Wrangling with DataFrames](#wrangle_dataframes)
+	- [](#)
+	- [](#)
+	- [](#)
 	- [](#)
 	- [](#)
 
@@ -615,10 +622,368 @@ Keep in mind that Spark is not a data storage system, and there are a number of 
 	...
 	```
 
+## Imperative vs Declarative programming <a name="imp_vs_decl"></a>
+- Imperarive programming cares about **HOW?** --> How are we getting the result?
+- Declarative programming cares about **WHAT?** --> What is the result?
 
+- Declarative systems are an **Abstraction Layer** of an imperative system
 
+	![image17]
 
+## Data Wrangling with DataFrames <a name="wrangle_dataframes"></a>
+- Open Jupyter Notebook ```data_wrangling.ipynb```
 
+	### Import libraries, instantiate a SparkSession, and then read in the data set 
+	```
+	from pyspark.sql import SparkSession
+	from pyspark.sql.functions import udf
+	from pyspark.sql.types import StringType
+	from pyspark.sql.types import IntegerType
+	from pyspark.sql.functions import desc
+	from pyspark.sql.functions import asc
+	from pyspark.sql.functions import sum as Fsum
+
+	import datetime
+
+	import numpy as np
+	import pandas as pd
+	%matplotlib inline
+	import matplotlib.pyplot as plt
+	```
+	```
+	spark = SparkSession \
+		.builder \
+		.appName("Wrangling Data") \
+		.getOrCreate()
+	```
+	```
+	path = "data/sparkify_log_small.json"
+	user_log = spark.read.json(path)
+	```
+	### EXPLORATE THE DATA
+	```
+	user_log.take(5)
+
+	Result:
+	[Row(artist='Showaddywaddy', auth='Logged In', firstName='Kenneth', gender='M', itemInSession=112, lastName='Matthews', length=232.93342, level='paid', location='Charlotte-Concord-Gastonia, NC-SC', method='PUT', page='NextSong', registration=1509380319284, sessionId=5132, song='Christmas Tears Will Fall', status=200, ts=1513720872284, userAgent='"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36"', userId='1046'),
+
+	...
+	]
+	```
+	```
+	user_log.printSchema()
+
+	Result:
+	root
+	|-- artist: string (nullable = true)
+	|-- auth: string (nullable = true)
+	|-- firstName: string (nullable = true)
+	|-- gender: string (nullable = true)
+	|-- itemInSession: long (nullable = true)
+	|-- lastName: string (nullable = true)
+	|-- length: double (nullable = true)
+	|-- level: string (nullable = true)
+	|-- location: string (nullable = true)
+	|-- method: string (nullable = true)
+	|-- page: string (nullable = true)
+	|-- registration: long (nullable = true)
+	|-- sessionId: long (nullable = true)
+	|-- song: string (nullable = true)
+	|-- status: long (nullable = true)
+	|-- ts: long (nullable = true)
+	|-- userAgent: string (nullable = true)
+	|-- userId: string (nullable = true)
+	```
+	```
+	user_log.describe().show()
+
+	Result:
+	see above --> complex to read
+	```
+	Take a look at individual columns with the following (here column artist)
+	```
+	user_log.describe("artist").show()
+
+	Result:
+	+-------+-----------------+
+	|summary|           artist|
+	+-------+-----------------+
+	|  count|             8347|
+	|   mean|            461.0|
+	| stddev|            300.0|
+	|    min|              !!!|
+	|    max|ÃÂlafur Arnalds|
+	+-------+-----------------+
+	```
+	A column of numeric type will look like this (1000 session id, max values 7144 etc.)
+	```
+	user_log.describe("sessionId").show()
+
+	Result:
+	+-------+------------------+
+	|summary|         sessionId|
+	+-------+------------------+
+	|  count|             10000|
+	|   mean|         4436.7511|
+	| stddev|2043.1281541827557|
+	|    min|                 9|
+	|    max|              7144|
+	+-------+------------------+
+	```
+	Check the number of rows
+	```
+	user_log.count()
+
+	Result:
+	10000
+	```
+	Check the sort of page requests by looking at the page field. Drop diblicates and sort it. User can log in/out, can visit the homepage, play a song etc. ...
+	Submit Downgrade is interesting. These are users who choose to downgrade their paid account nto get a free one.
+	```
+	user_log.select("page").dropDuplicates().sort("page").show()
+
+	Result:
+	+----------------+
+	|            page|
+	+----------------+
+	|           About|
+	|       Downgrade|
+	|           Error|
+	|            Help|
+	|            Home|
+	|           Login|
+	|          Logout|
+	|        NextSong|
+	|   Save Settings|
+	|        Settings|
+	|Submit Downgrade|
+	|  Submit Upgrade|
+	|         Upgrade|
+	+----------------+
+	```
+	Get events with a particular user ID by filtering a particular value
+	```
+	user_log.select(["userId", "firstname", "page", "song"]).where(user_log.userId == "1046").collect()
+
+	Result:
+	[Row(userId='1046', firstname='Kenneth', page='NextSong', song='Christmas Tears Will Fall'),
+	Row(userId='1046', firstname='Kenneth', page='NextSong', song='Be Wary Of A Woman'),
+	Row(userId='1046', firstname='Kenneth', page='NextSong', song='Public Enemy No.1'),
+	Row(userId='1046', firstname='Kenneth', page='NextSong', song='Reign Of The Tyrants'),
+	Row(userId='1046', firstname='Kenneth', page='NextSong', song='Father And Son'),
+	Row(userId='1046', firstname='Kenneth', page='NextSong', song='No. 5'),
+	Row(userId='1046', firstname='Kenneth', page='NextSong', song='Seventeen'),
+	Row(userId='1046', firstname='Kenneth', page='Home', song=None),
+	Row(userId='1046', firstname='Kenneth', page='NextSong', song='War on war'),
+	... ]
+	```
+	### Calculating Statistics by Hour
+	First convert timestamps to datetime from epoch time to get the hour of the day. Create a user defined function called get_hour
+	```
+	get_hour = udf(lambda x: datetime.datetime.fromtimestamp(x / 1000.0).hour)
+	```
+	With this function we can add a new column called 'hour' 
+	```
+	user_log = user_log.withColumn("hour", get_hour(user_log.ts))
+	```
+	Take a look at the first record. Hour is 10pm for the first record
+	```
+	user_log.head()
+
+	Result:
+	Row(artist='Showaddywaddy', auth='Logged In', firstName='Kenneth', gender='M', itemInSession=112, lastName='Matthews', length=232.93342, level='paid', location='Charlotte-Concord-Gastonia, NC-SC', method='PUT', page='NextSong', registration=1509380319284, sessionId=5132, song='Christmas Tears Will Fall', status=200, ts=1513720872284, userAgent='"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36"', userId='1046', hour='22')
+	```
+	Now compute the next song page request and group by the hour column. Aggregate it by counting and order the resultsby hour
+	```
+	songs_in_hour = user_log.filter(user_log.page == "NextSong").groupby(user_log.hour).count().orderBy(user_log.hour.cast("float"))
+	```
+	```
+	songs_in_hour.show()
+
+	Result:
+	+----+-----+
+	|hour|count|
+	+----+-----+
+	|   0|  456|
+	|   1|  454|
+	|   2|  382|
+	|   3|  302|
+	|   4|  352|
+	|   5|  276|
+	|   6|  348|
+	|   7|  358|
+	|   8|  375|
+	|   9|  249|
+	|  10|  216|
+	|  11|  228|
+	|  12|  251|
+	|  13|  339|
+	|  14|  462|
+	|  15|  479|
+	|  16|  484|
+	|  17|  430|
+	|  18|  362|
+	|  19|  295|
+	+----+-----+
+	only showing top 20 rows
+	```
+	Let's turn tzhe small Spark dataframe into a Pandas dataframe 
+	```
+	songs_in_hour_pd = songs_in_hour.toPandas()
+	songs_in_hour_pd.hour = pd.to_numeric(songs_in_hour_pd.hour)
+	```
+	Use matplotlib to plot the graph
+	```
+	plt.scatter(songs_in_hour_pd["hour"], songs_in_hour_pd["count"])
+	plt.xlim(-1, 24);
+	plt.ylim(0, 1.2 * max(songs_in_hour_pd["count"]))
+	plt.xlabel("Hour")
+	plt.ylabel("Songs played");
+	```
+	![image18]
+
+	### Drop Rows with Missing Values
+	With dropna-any method we drop all records that have none in the subset user_ID and sessionId
+	```
+	user_log_valid = user_log.dropna(how = "any", subset = ["userId", "sessionId"])
+	```
+	```
+	user_log_valid.count()
+
+	Result:
+	10000
+	```
+	As you see, it turns out there are no missing values in the userID or session columns. But there are userID values that are empty strings.
+	```
+	user_log.select("userId").dropDuplicates().sort("userId").show()
+
+	Result:
+	+------+
+	|userId|
+	+------+
+	|      |
+	|    10|
+	|   100|
+	|  1000|
+	|  1003|
+	|  1005|
+	|  1006|
+	|  1017|
+	|  1019|
+	|  1020|
+	|  1022|
+	|  1025|
+	|  1030|
+	|  1035|
+	|  1037|
+	|   104|
+	|  1040|
+	|  1042|
+	|  1043|
+	|  1046|
+	+------+
+	only showing top 20 rows
+	```
+	Let's filter out rows with empty string 
+	```
+	user_log_valid = user_log_valid.filter(user_log_valid["userId"] != "")
+	```
+	Count values again
+	```
+	user_log_valid.count()
+	```
+	### Users Downgrade Their Accounts
+	Find when users downgrade their accounts and then flag those log entries. Then use a window function and cumulative sum to distinguish each user's data as either pre or post downgrade events.
+
+	So first let's find the users who downgraded their service
+	```
+	user_log_valid.filter("page = 'Submit Downgrade'").show()
+
+	Result: Kelly downgraded her service
+
+	+------+---------+---------+------+-------------+--------+------+-----+--------------------+------+----------------+-------------+---------+----+------+-------------+--------------------+------+----+
+	|artist|     auth|firstName|gender|itemInSession|lastName|length|level|            location|method|            page| registration|sessionId|song|status|           ts|           userAgent|userId|hour|
+	+------+---------+---------+------+-------------+--------+------+-----+--------------------+------+----------------+-------------+---------+----+------+-------------+--------------------+------+----+
+	|  null|Logged In|    Kelly|     F|           24|  Newton|  null| paid|Houston-The Woodl...|   PUT|Submit Downgrade|1513283366284|     5931|null|   307|1513768454284|Mozilla/5.0 (Wind...|  1138|  11|
+	+------+---------+---------+------+-------------+--------+------+-----+--------------------+------+----------------+-------------+---------+----+------+-------------+--------------------+------+----+
+	```
+	Take a look at her user activity. Via the level column one can see 
+	```
+	user_log.select(["userId", "firstname", "page", "level", "song"]).where(user_log.userId == "1138").collect()
+
+	Result:
+	[Row(userId='1138', firstname='Kelly', page='Home', level='paid', song=None),
+	Row(userId='1138', firstname='Kelly', page='NextSong', level='paid', song='Everybody Everybody'),
+	Row(userId='1138', firstname='Kelly', page='NextSong', level='paid', song='Gears'),
+	Row(userId='1138', firstname='Kelly', page='NextSong', level='paid', song='Use Somebody'),
+	
+	...
+	
+	Row(userId='1138', firstname='Kelly', page='NextSong', level='paid', song='The Razor (Album Version)'),
+	Row(userId='1138', firstname='Kelly', page='NextSong', level='paid', song='Idols and Anchors'),
+	Row(userId='1138', firstname='Kelly', page='Downgrade', level='paid', song=None),
+	Row(userId='1138', firstname='Kelly', page='Submit Downgrade', level='paid', song=None),
+	Row(userId='1138', firstname='Kelly', page='Home', level='free', song=None),
+	Row(userId='1138', firstname='Kelly', page='NextSong', level='free', song='Bones'),
+	Row(userId='1138', firstname='Kelly', page='Home', level='free', song=None),
+	Row(userId='1138', firstname='Kelly', page='NextSong', level='free', song='Grenouilles Mantidactylus (Small Frogs)')]
+	```
+	Create a new column which divides events of a particular user based on this special downgrade event --> let's call the column phase. The user have a differnt value in the phase column before and after downgrading
+
+	To get phase flag records that refer to that special event. Create a lambda function which returns 1 to downgrade and zero otherwise
+	```
+	flag_downgrade_event = udf(lambda x: 1 if x == "Submit Downgrade" else 0, IntegerType())
+	```
+	Create a column downgraded
+	```
+	user_log_valid = user_log_valid.withColumn("downgraded", flag_downgrade_event("page"))
+	```
+	```
+	user_log_valid.head()
+
+	Result:
+	Row(artist='Showaddywaddy', auth='Logged In', firstName='Kenneth', gender='M', itemInSession=112, lastName='Matthews', length=232.93342, level='paid', location='Charlotte-Concord-Gastonia, NC-SC', method='PUT', page='NextSong', registration=1509380319284, sessionId=5132, song='Christmas Tears Will Fall', status=200, ts=1513720872284, userAgent='"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36"', userId='1046', hour='22', downgraded=0)
+	```
+	Now compute 'phase'
+	```
+	from pyspark.sql import Window
+	```
+	Define a window function, where we partition (it's similar to group_by) by user_id, order events in a descending time order, take into account all previous rows, but no rows afterwards with 0.
+	```
+	windowval = Window.partitionBy("userId").orderBy(desc("ts")).rangeBetween(Window.unboundedPreceding, 0)
+	```
+	```
+	user_log_valid = user_log_valid.withColumn("phase", Fsum("downgraded").over(windowval))
+	```
+	```
+	user_log_valid.select(["userId", "firstname", "ts", "page", "level", "phase"]).where(user_log.userId == "1138").sort("ts").collect()	
+
+	Result:
+	[Row(userId='1138', firstname='Kelly', ts=1513729066284, page='Home', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513729066284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513729313284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513729552284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513729783284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513730001284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513730263284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513730518284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513730768284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513731182284, page='NextSong', level='paid', phase=1),
+
+	...
+
+	 Row(userId='1138', firstname='Kelly', ts=1513767413284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513767643284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513768012284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513768242284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513768452284, page='NextSong', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513768453284, page='Downgrade', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513768454284, page='Submit Downgrade', level='paid', phase=1),
+	Row(userId='1138', firstname='Kelly', ts=1513768456284, page='Home', level='free', phase=0),
+	Row(userId='1138', firstname='Kelly', ts=1513814880284, page='NextSong', level='free', phase=0),
+	Row(userId='1138', firstname='Kelly', ts=1513821430284, page='Home', level='free', phase=0),
+	Row(userId='1138', firstname='Kelly', ts=1513833144284, page='NextSong', level='free', phase=0)]
+	```
 
 
 
