@@ -1054,6 +1054,13 @@ For further information see the [Spark SQL, DataFrames and Datasets Guide](https
 	Result:
 	7521
 	```
+	Or use:
+	```
+	df.agg(max("DescLength")).show()
+
+	Result:
+	7521
+	```
 	```
 	min_desc_len = df.agg({"DescLength": "min"}).collect()[0][0]
 	min_desc_len
@@ -1061,6 +1068,33 @@ For further information see the [Spark SQL, DataFrames and Datasets Guide](https
 	Reusult:
 	4
 	```
+	Or Use
+	```
+	df.agg(min("DescLength")).show()
+
+	Reusult:
+	4
+	```
+- mean
+	```
+	df.agg(mean("DescLength")).show()
+	```
+- stddev
+	```
+	df.agg(stddev("DescLength")).show()
+	```
+- mean and stdev
+	```
+	df.agg(avg("DescLength"), stddev("DescLength")).show()
+
+	Result:
+	+---------------+-----------------------+
+	|avg(DescLength)|stddev_samp(DescLength)|
+	+---------------+-----------------------+
+	|      180.28187|     192.10819533505023|
+	+---------------+-----------------------+
+	```
+
 
 ## Difference between collect(), show(), take() <a name="differences_spark_collect_show_take"></a>
 
