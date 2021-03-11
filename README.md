@@ -80,6 +80,7 @@ Here is an outline of the topics:
 	- [Imperative vs Declarative programming](#imp_vs_decl)
 	- [Data Wrangling with DataFrames](#wrangle_dataframes)
 	- [Wrangling Data Functions Overview](#wrangle_data_fun_overview)
+	- [Some important aggregate function using agg](#agg_func)
 	- [Difference between collect(), show(), take()](#differences_spark_collect_show_take)
 	- [Spark SQL](#spark_sql)
 	- [RDDs](#rdds)
@@ -1044,6 +1045,23 @@ Keep in mind that Spark is not a data storage system, and there are a number of 
 
 For further information see the [Spark SQL, DataFrames and Datasets Guide](https://spark.apache.org/docs/latest/sql-programming-guide.html) and the [Spark Python API Docs](https://spark.apache.org/docs/latest/api/python/index.html).
 
+## Some important aggregate function using agg <a name="agg_func"></a>
+- min and max
+	```
+	max_desc_len =df.agg({"DescLength": "max"}).collect()[0][0]
+	max_desc_len
+
+	Result:
+	7521
+	```
+	```
+	min_desc_len = df.agg({"DescLength": "min"}).collect()[0][0]
+	min_desc_len
+
+	Reusult:
+	4
+	```
+
 ## Difference between collect(), show(), take() <a name="differences_spark_collect_show_take"></a>
 
 - df.show() - shows only content
@@ -1494,31 +1512,6 @@ You can find more information on tuning [Spark](https://spark.apache.org/docs/la
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Setup Instructions <a name="Setup_Instructions"></a>
 The following is a brief set of instructions on setting up a cloned repository.
 
@@ -1545,28 +1538,29 @@ $ export PATH="/path/to/anaconda/bin:$PATH"
 - Change Directory to your project older, e.g. `cd my_github_projects`
 - Clone the Github Project inside this folder with Git Bash (Terminal) via:
 ```
-$ git clone https://github.com/ddhartma/Recommendation-Engines.git
+$ git clone https://github.com/ddhartma/Spark-Big-Data-Analytics.git
 ```
 
 - Change Directory
 ```
-$ cd Recommendation-Engines
+$ cd Spark-Big-Data-Analytics
 ```
 
-- Create a new Python environment, e.g. rec_eng. Inside Git Bash (Terminal) write:
+- Create a new Python environment, e.g. spark_env. Inside Git Bash (Terminal) write:
 ```
-$ conda create --name rec_eng
+$ conda create --name spark_env
 ```
 
 - Activate the installed environment via
 ```
-$ conda activate rec_eng
+$ conda activate spark_env
 ```
 
 - Install the following packages (via pip or conda)
 ```
 numpy = 1.17.4
 pandas = 0.24.2
+pyspark
 ```
 
 - Check the environment installation via
