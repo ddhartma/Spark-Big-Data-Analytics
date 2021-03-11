@@ -1094,7 +1094,15 @@ For further information see the [Spark SQL, DataFrames and Datasets Guide](https
 	|      180.28187|     192.10819533505023|
 	+---------------+-----------------------+
 	```
+- avg
+	```
+	df.agg(avg("DescLength")).show()
+	```
+- Chaining aggregates:
+	```
+	df.groupby("DescGroup").agg(avg(col("DescLength")), avg(col("NumTags")), count(col("DescLength"))).orderBy("avg(DescLength)").show()
 
+	```
 
 ## Difference between collect(), show(), take() <a name="differences_spark_collect_show_take"></a>
 
